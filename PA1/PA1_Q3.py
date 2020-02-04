@@ -8,15 +8,17 @@ N_BANDITS = 10
 normal = np.random.normal
 cmap = mpl.cm.get_cmap('tab20')
 
-def run_task(mu, var, tau):
+def run_task(mu, var, policy):
 	std_dev = np.sqrt(var)
 
 	# estimates of action values for the arms
 	Q_a_est = np.random.uniform(low=-1, high=1, size=(N_BANDITS,))
+	
 	# track no. of times actions are taken
-	a_steps = np.zeros((N_BANDITS,))
+	a_steps = np.ones((N_BANDITS,))
 	# track UCB for all arms
 	UCB = np.zeros((N_BANDITS,))
+
 	play_rewards = np.zeros((N_PLAYS,))
 
 	# no. of times optimal action was chosen
@@ -25,6 +27,25 @@ def run_task(mu, var, tau):
 	# run current task for N_PLAYS
 	total_reward = 0
 	for i in range(N_PLAYS):
+		if policy == "greedy":
+			action = np.argmax(Q_a_est)
+		elif policy == "eps-greedy":
+			epsilon = 0.1
+			# exploit
+			if np.random.random() > epsilon:
+				action = np.argmax(Q_a_est)
+			# explore
+			else:
+				action = np.random.randint(low=0, high=N_BANDITS)
+		elif policy == "softmax":
+			tau = 0.1
+			# calculate softmax activations
+			softmax_prob = np.exp(Q_a_est/tau)/(np.sum(np.exp(Q_a_est/tau)))
+			action = np.random.choice(range(N_BANDITS), 1, p=softmax_prob)
+		elif policy == "UCB1":
+			# choose action according max UCB
+			action = np.argmax(Q_a_est + np.sqrt(2*np.log(i+1)/(a_steps)))
+			# print("HI!")
 		
 		# get rewards for each action
 		reward = normal(mu, var)
@@ -38,13 +59,11 @@ def run_task(mu, var, tau):
 		# update action steps tracker
 		a_steps[action] = k_a + 1
 
-		# total_reward += reward[action]
-		# avg_reward[i] = total_reward/(i + 1)
 		play_rewards[i] = reward[action]
 
 	return play_rewards, opt_action_chosen
 
-def run_test(tau):
+def run_test(policy):
 	avg_rewards = np.zeros((N_PLAYS,))
 	avg_opt_choose = np.zeros((N_PLAYS))
 	rewards = np.zeros((2000, N_PLAYS))
@@ -56,7 +75,7 @@ def run_test(tau):
 		var = np.ones((N_BANDITS,))
 
 		# get rewards over N_PLAYS for the current task
-		task_rewards, opt_action_choose = run_task(mu, var, tau)
+		task_rewards, opt_action_choose = run_task(mu, var, policy)
 
 		rewards[i,:] = task_rewards
 		avg_rewards += task_rewards
@@ -66,23 +85,19 @@ def run_test(tau):
 
 def main():
 	plays = np.linspace(1, N_PLAYS, N_PLAYS)
-	print("0")
-	avg_rewards_1, _, opt_choose_1 = run_test(0.1)
-	print("1")
-	avg_rewards_2, _, opt_choose_2 = run_test(0.01)
-	print("2")
-	avg_rewards_3, _, opt_choose_3 = run_test(1)
-	print("3")
-	avg_rewards_4, _, opt_choose_4 = run_test(10)
-	# eps_greedy_policy_avg_03, _, opt_choose_4 = run_test()
+	greedy, _, opt_greedy = run_test("greedy")
+	eps_greedy, _, opt_eps_greedy = run_test("eps-greedy")
+	softmax, _, opt_softmax = run_test("softmax")
+	UCB1, _, opt_UCB1 = run_test("UCB1")
+
 
 	# plotting
 	plt.figure(figsize=(12, 9))
 	ax = plt.subplot(111)
-	plt.plot(plays, avg_rewards_1, color=cmap(0.4), label=r'$\tau = 0.1$')
-	plt.plot(plays, avg_rewards_2, color=cmap(0.3), label=r'$\tau = 0.01$')
-	plt.plot(plays, avg_rewards_3, color=cmap(0.2), label=r'$\tau = 1$')
-	plt.plot(plays, avg_rewards_4, color=cmap(0.1), label=r'$\tau = 10$')
+	plt.plot(plays, greedy, color=cmap(0.4), label="Greedy")
+	plt.plot(plays, eps_greedy, color=cmap(0.3), label="Eps-Greedy")
+	plt.plot(plays, softmax, color=cmap(0.2), label="Softmax")
+	plt.plot(plays, UCB1, color=cmap(0.1), label="UCB1")
 	ax.spines["top"].set_visible(False)    
 	ax.spines["right"].set_visible(False)    
 	ax.get_xaxis().tick_bottom()    
@@ -97,10 +112,10 @@ def main():
 	# plotting
 	plt.figure(figsize=(12, 9))
 	ax = plt.subplot(111)
-	plt.plot(plays, opt_choose_1, color=cmap(0.4), label=r'$\tau = 0.1$')
-	plt.plot(plays, opt_choose_2, color=cmap(0.3), label=r'$\tau = 0.01$')
-	plt.plot(plays, opt_choose_3, color=cmap(0.2), label=r'$\tau = 1$')
-	plt.plot(plays, opt_choose_4, color=cmap(0.1), label=r'$\tau = 10$')
+	plt.plot(plays, opt_greedy, color=cmap(0.4), label="Greedy")
+	plt.plot(plays, opt_eps_greedy, color=cmap(0.3), label="Eps-Greedy")
+	plt.plot(plays, opt_softmax, color=cmap(0.2), label="Softmax")
+	plt.plot(plays, opt_UCB1, color=cmap(0.1), label="UCB1")
 	ax.spines["top"].set_visible(False)    
 	ax.spines["right"].set_visible(False)    
 	ax.get_xaxis().tick_bottom()    

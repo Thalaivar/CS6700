@@ -45,25 +45,51 @@ class PuddleWorld(gym.Env):
         self.state = initial_states[initial_choice]
 
     def step(self, action):
+        # check if action is valid
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
-        
+        # check if goal state is set
+        if self.state is None:
+            raise ValueError("Goal state not set")
+        done = False
+
         state = self.state
         x, y = puddle_world_transition(state, action, self.wind)
+
+        self.state = (x, y)
+        r, done = self.reward()
+
+        return np.array(self.state), r, done, {}
+        
 
     def reward(self):
         # reward for reaching goal state
         if self.state == self.goal_state:
-            return 10
+            r = 10
+            done = True
         
         # penalize entering the puddle
         if self.state in self.DEPTH_1:
-            return -1
+            r = -1
         elif self.state in self.DEPTH_2:
-            return -2
+            r = -2
         elif self.state in self.DEPTH_3:
-            return -3
+            r = -3
         
+        # penalty for distance from goal
+        if self.distance_reward:
+            distance_reward = (self.state[0]-self.goal_state[0])**2 + (self.state[1] - self.goal_state[1])**2
+            r -= 0.1*distance_reward
+        
+        return r, done
 
+    def set_wind(self, wind):
+        self.wind = wind
+    
+    def set_distance_reward(self, distance_reward):
+        self.distance_reward = distance_reward
+
+    def set_goal_state(self, goal_state):
+        self.goal_state = goal_state
 
     
 def puddle_world_transition(state, action, wind):

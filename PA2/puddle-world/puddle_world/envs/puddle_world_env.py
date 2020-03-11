@@ -9,7 +9,7 @@ class PuddleWorld(gym.Env):
         that describes the (x,y) position of the agent in the gridworld
         """
         OBS_DIM = 12
-        self.observation_space = spaces.Tuple(spaces.Discrete(12), spaces.Discrete(12))
+        self.observation_space = spaces.Tuple((spaces.Discrete(12), spaces.Discrete(12)))
         
         """
         Action space is scalar discrete with values in the range [0, 3], where:
@@ -41,14 +41,16 @@ class PuddleWorld(gym.Env):
 
     def reset(self):
         initial_states = [(0,0), (0,1), (0,5), (0,6)]
-        initial_choice = np.random.choice(np.arange(4), 1)
-        self.state = initial_states[initial_choice]
+        initial_choice = np.random.choice(np.arange(4, dtype="int32"), 1)
+        self.state = initial_states[initial_choice[0]]
+
+        return np.array(self.state)
 
     def step(self, action):
         # check if action is valid
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
         # check if goal state is set
-        if self.state is None:
+        if self.goal_state is None:
             raise ValueError("Goal state not set")
         done = False
 
@@ -62,6 +64,9 @@ class PuddleWorld(gym.Env):
         
 
     def reward(self):
+        r = 0
+        done = False
+        
         # reward for reaching goal state
         if self.state == self.goal_state:
             r = 10

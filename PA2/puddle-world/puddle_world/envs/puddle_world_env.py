@@ -45,6 +45,23 @@ class PuddleWorld(gym.Env):
         self.state = initial_states[initial_choice]
 
     def step(self, action):
+        assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
+        
+        state = self.state
+        x, y = puddle_world_transition(state, action, self.wind)
+
+    def reward(self):
+        # reward for reaching goal state
+        if self.state == self.goal_state:
+            return 10
+        
+        # penalize entering the puddle
+        if self.state in self.DEPTH_1:
+            return -1
+        elif self.state in self.DEPTH_2:
+            return -2
+        elif self.state in self.DEPTH_3:
+            return -3
         
 
 

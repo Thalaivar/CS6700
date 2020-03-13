@@ -21,7 +21,7 @@ def main():
     gamma = 0.7
     alpha_w = 0.0001
 
-    env = gym.make("PA2_envs:chakra-v0")
+    env = gym.make("PA2_envs:vishamC-v0")
     env.tol = 1e-3
 
     avg_rewards = train(200, env, [N, alpha, gamma, alpha_w])

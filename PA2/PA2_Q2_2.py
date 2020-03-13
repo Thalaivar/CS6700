@@ -21,7 +21,7 @@ def main():
     alpha_w = 0.001
     theta = np.load("no_baseline_policy.npy")
 
-    env = gym.make("PA2_envs:chakra-v0")
+    env = gym.make("PA2_envs:vishamC-v0")
     env.tol = 1e-3
 
     avg_RMS, w = train(200, env, [N, gamma, alpha_w, theta])
@@ -34,7 +34,6 @@ def train(iterations, env, params):
     N, gamma, alpha_w, theta = params
 
     # randomly initialize parameters
-    theta = np.random.randn(2, 3)
     w = np.random.randn(6,1)
 
     avg_RMS = np.zeros((iterations,))
@@ -108,7 +107,7 @@ def calculate_RMS_error(returns, states, w):
         v_cap, _ = baseline(states[i], w)
         RMS_error[i] = (returns[i] - v_cap)**2
 
-    return np.sum(np.sqrt(RMS_error))
+    return np.sum(np.sqrt(RMS_error))/np.size(RMS_error)
 
 def generate_trajectory(s_0, theta, env):
     MAX_STEPS = 40

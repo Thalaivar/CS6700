@@ -16,29 +16,30 @@ STATE_DIM = 2
 ACTION_DIM = 2
 
 def main():
-    alpha = 0.025
     N = 500
     gamma = 0.7
-    alpha_w = 0.0001
+    alpha_w = 0.001
+    theta = np.load("no_baseline_policy.npy")
 
     env = gym.make("PA2_envs:chakra-v0")
     env.tol = 1e-3
 
-    avg_rewards = train(200, env, [N, alpha, gamma, alpha_w])
-    plt.plot(np.arange(len(avg_rewards)), avg_rewards)
+    avg_RMS, w = train(200, env, [N, gamma, alpha_w, theta])
+    np.save("VFA_params", w)
+
+    plt.plot(np.arange(len(avg_RMS)), avg_RMS)
     plt.show()
 
 def train(iterations, env, params):
-    N, alpha, gamma, alpha_w = params
+    N, gamma, alpha_w, theta = params
 
     # randomly initialize parameters
     theta = np.random.randn(2, 3)
     w = np.random.randn(6,1)
 
-    avg_rewards = np.zeros((iterations,))
+    avg_RMS = np.zeros((iterations,))
     for i in range(iterations):
-        reward = 0
-        grad = np.zeros((ACTION_DIM, STATE_DIM + 1))
+        RMS_error = 0
 
         # generate N trajectories and accumulate gradient
         for j in range(N):
@@ -50,28 +51,20 @@ def train(iterations, env, params):
             # print(traj[1])
             returns = calculate_returns(traj[3], gamma)
 
-            # train baseline
+            # train VFA function
             w = train_baseline(returns, traj[1], w, alpha_w)
 
-            # accummulate gradient over trajectory
-            dgrad = accumulate_grad(traj, theta, baseline, returns, w)
-            grad += dgrad
-            reward += np.sum(traj[3])
+            # calcullate RMS error for trajectory
+            RMS_error += calculate_RMS_error(returns, traj[1], w)
 
             # print("iter: %d ; trajectory: %d" % (i, j))
 
         # grad = grad/N
-        avg_rewards[i] = reward/N
+        avg_RMS[i] = RMS_error/N
 
         print("iter: %d" % (i))
 
-        # normalize grad
-        grad = grad/(norm(grad) + 1e-8)
-
-        # update theta
-        theta += alpha*grad
-
-    return avg_rewards
+    return avg_RMS, w
 
 def baseline_basis(x):
     return np.array([[x[0]], [x[1]], [1], [x[0]**2], [x[1]**2], [x[1]*x[0]]])
@@ -91,16 +84,6 @@ def train_baseline(returns, states, w, alpha_w):
 
     return w
 
-def accumulate_grad(trajectory, theta, baseline, returns, w):
-    steps, states, actions, _ = trajectory
-
-    grad = np.zeros((ACTION_DIM, STATE_DIM + 1))
-    for i in range(steps):
-        b, _ = baseline(states[i], w)
-        grad += policy_gradient(theta, states[i], actions[i])*(returns[i] - b)
-    
-    return grad
-
 def calculate_returns(rewards, gamma):
     steps = np.size(rewards)
 
@@ -116,6 +99,16 @@ def calculate_returns(rewards, gamma):
         G[i] = Gt
     
     return G
+
+def calculate_RMS_error(returns, states, w):
+    steps = np.size(returns)
+    RMS_error = np.zeros((steps,))
+
+    for i in range(steps):
+        v_cap, _ = baseline(states[i], w)
+        RMS_error[i] = (returns[i] - v_cap)**2
+
+    return np.sum(np.sqrt(RMS_error))
 
 def generate_trajectory(s_0, theta, env):
     MAX_STEPS = 40

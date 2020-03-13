@@ -19,8 +19,11 @@ class Chakra(gym.Env):
         self.state = None
 
     def reset(self):
-        x, y = -1 + 2*np.random.rand(2)
-        self.state = (x, y)
+        while True:
+            x, y = -1 + 2*np.random.rand(2)
+            if np.sqrt(x**2 + y**2) > 0.9:
+                self.state = (x, y)
+                break
 
         return np.array(self.state)
 
@@ -29,12 +32,18 @@ class Chakra(gym.Env):
         x, y = state
 
         # get reward
-        r = x**2 + y**2
+        r = -x**2 - y**2
 
         x += action[0]
         y += action[1]
         done = False
+
+        # check if goal state reached
         if np.sqrt(x**2 + y**2) < self.tol:
+            done = True
+
+        # check if OOB
+        if abs(x) > 1 or abs(y) > 1:
             done = True
 
         self.state = (x, y)

@@ -19,13 +19,13 @@ def main():
     N = 500
     gamma = 0.7
     alpha_w = 0.001
-    theta = np.load("no_baseline_policy.npy")
+    theta = np.load("no_baseline_pg_visham_policy.npy")
 
     env = gym.make("PA2_envs:vishamC-v0")
     env.tol = 1e-3
 
     avg_RMS, w = train(200, env, [N, gamma, alpha_w, theta])
-    np.save("VFA_params", w)
+    np.save("VFA_params_vishamC", w)
 
     plt.plot(np.arange(len(avg_RMS)), avg_RMS)
     plt.show()

@@ -29,8 +29,7 @@ class VishamC(gym.Env):
         x, y = state
 
         # get reward
-        gamma = 10
-        r = 0.5*x**2 + gamma*0.5*y**2
+        r = -0.5*(x**2) - 5*(y**2)
 
         x += action[0]
         y += action[1]

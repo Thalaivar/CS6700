@@ -58,10 +58,10 @@ class RoomWorld(gym.Env):
         while not init: 
             x0, y0 = self.observation_space.sample()
             if [x0, y0] not in self.walls:
-                self.state = [x0, y0]
+                self.state = (x0, y0)
                 init = True
 
-        return np.array(self.state)
+        return list(self.state)
 
     def step(self, action):
         # check if goal state is set
@@ -74,7 +74,7 @@ class RoomWorld(gym.Env):
 
         r, done = self.reward()
 
-        return np.array(self.state), r, done, {}
+        return list(self.state), r, done, {}
 
     def reward(self):
         r = 0

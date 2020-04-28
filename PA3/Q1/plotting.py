@@ -92,3 +92,23 @@ if __name__ == "__main__":
     # steps = np.load("results/results_steps_G2.npy")
     # visualize(Q_table, env, steps)
     
+    """
+    Part 2 with initial state fixed (goal G1)
+    """
+    # Q_table = np.load("results/results_Qtable_Q2_G1.npy")
+    # steps = np.load("results/results_steps_Q2_G1.npy")
+    # visualize(Q_table, env, steps)
+
+    """
+    Part 2 with initial state fixed (goal G2)
+    """
+    # Q_table = np.load("results/results_Qtable_Q2_G2.npy")
+    # steps = np.load("results/results_steps_Q2_G2.npy")
+    # visualize(Q_table, env, steps)
+
+    """
+    Intra option learning with G1
+    """
+    Q_table = np.load("results/results_Qtable_IO_G1.npy")
+    steps = np.load("results/results_steps_IO_G1.npy")
+    visualize(Q_table, env, steps)

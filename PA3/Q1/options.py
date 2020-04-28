@@ -1,4 +1,5 @@
 import copy
+import numpy as np
 
 # 4 rooms
 ROOM_1 = [[1,7], [2,7], [3,7], [4,7], [5,7],
@@ -45,6 +46,9 @@ class HallwayOption:
             self.init_set.append(self.env.hallways[room-1][0])
 
     def policy(self, state):
+        if state not in self.init_set:
+            raise ValueError("State not in option's state set!")
+            
         x, y = state
         # type 0 hallway -> walls on left and right
         if self.goal_type == 0:
@@ -74,7 +78,14 @@ class HallwayOption:
         
         return action
 
-    def run(self, state):
+    def run(self, state, algorithm="SMDP Learning", multi_step_options=None, Q_table=None, alpha=None):
+        if algorithm == "SMDP Learning":
+            return self.SMDP_Q_Learning(state)
+        
+        elif algorithm == "intra option learning":
+            return self.intra_option_learning(state, multi_step_options, Q_table, alpha)
+
+    def SMDP_Q_Learning(self, state):
         # accumulated reward while executing option
         R = 0
         # time steps till option terminates
@@ -96,3 +107,71 @@ class HallwayOption:
                 k += 1
 
         return state, R, done, k
+
+    def intra_option_learning(self, state, multi_step_options, Q_table, alpha):
+        R = 0
+        k = 0
+        option_on = True
+        while option_on:
+            if state not in self.init_set:
+                option_on = False
+                break
+            else:
+                # choose action according to option policy
+                action = self.policy(state)
+                # take action in environment
+                new_state, r, done, _ = self.env.step(action)
+                # get consistent options
+                consistent_opts = find_consistent_options(state, action, multi_step_options)
+                # valid options for new state
+                valid_opts = valid_options(new_state, multi_step_options)
+                # update for the consistent options
+                x, y = state
+                x_new, y_new = new_state
+                for o in consistent_opts:
+                    # option continues in next state i.e. β(sₜ₊₁) = 0
+                    if new_state in multi_step_options[o-4].init_set:
+                        Q_bar = Q_table[x_new, y_new, o]
+                    # option terminates in next state i.e. β(sₜ₊₁) = 1
+                    else:
+                        Q_bar = np.max(Q_table[x_new, y_new, valid_opts])
+                    
+                    # update consistent option
+                    Q_table[x, y, o] += alpha*(r + self.env.gamma*Q_bar - Q_table[x, y, o])
+                
+                state = new_state
+                # accumulate reward
+                R += (self.env.gamma**k)*r
+                k += 1
+                option_on = not done
+
+        return state, R, done, k
+
+                
+
+def find_consistent_options(state, action, multi_step_options):
+    # find consistent policies in s_t
+    i = 4
+    consistent_opts = []
+    for option in multi_step_options:
+        if state in option.init_set:
+            if  option.policy(state) == action:
+                consistent_opts.append(i)
+        
+        i += 1
+
+    return consistent_opts
+
+# given state, return valid options
+def valid_options(state, multi_step_options):
+    i = 0
+    # primitive actions are always valid options
+    valid_opts = [0, 1, 2, 3]
+    for option in multi_step_options:
+        # if state is in option's initiation set, option is valid
+        if state in option.init_set:
+            valid_opts.append(i+4)
+        
+        i += 1
+    
+    return valid_opts

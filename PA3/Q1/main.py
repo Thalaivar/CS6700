@@ -14,23 +14,23 @@ def main(goal_state):
         env.goal = env.G2
 
     # uncomment this for part 2
-    env.initial_state_fix = True
+    env.initial_state_fix = False
 
     steps, Q_table, _ = train(env)
 
-    np.save("results/results_Qtable_Q2", Q_table)
-    np.save("results/results_steps_Q2", steps)
-
+    np.save("results/results_Qtable_IO_G2", Q_table)
+    np.save("results/results_steps_IO_G2", steps)
+    
 def train(env):
     alpha = 1/8
-
-    # total of 12 options: 4 primitive actions and 8 multi-step options
 
     # multi-step options
     multi_step_options = create_options(env)
     
     # track of steps per episode
     steps = np.zeros((N_EPISODES,))
+
+    # total of 12 options: 4 primitive actions and 8 multi-step options
     # average Q_table
     avg_Q_table = np.zeros((13, 13, 12))
 
@@ -43,17 +43,17 @@ def train(env):
             while not done:
                 x, y = state
                 option = policy(state, multi_step_options, Q_table)
-                new_state, r, done, k = step(env, option, state, multi_step_options)
+                new_state, r, done, k = step(env, option, state, multi_step_options, Q_table, alpha)
 
                 # check valid options in new state
-                valid_opts = valid_options(state, multi_step_options)
+                valid_opts = valid_options(new_state, multi_step_options)
                 x_new, y_new = new_state
                 # Q - learning update
                 Q_table[x, y, option] += alpha*(r + (env.gamma**k)*np.max(Q_table[x_new, y_new, valid_opts]) - Q_table[x, y, option])
                 # print(state,"->", option, "->", new_state, "r:", r)
                 state = new_state
 
-                current_steps +=1
+                current_steps += k
                 # print(current_steps)
 
             steps[i] += current_steps
@@ -63,13 +63,17 @@ def train(env):
         print("Run = ", j)
     return steps/N_RUNS, avg_Q_table/N_RUNS, multi_step_options
 
+
 # composite step function to include multi-step options
-def step(env, option, state, multi_step_options):
+def step(env, option, state, multi_step_options, Q_table=None, alpha=None):
     # for multi-step option
     if option > 3:
         # retrieve multi-step option
         option = multi_step_options[(option-4)[0]]
-        state, r, done, k = option.run(state)
+        # SMDP Q-learning 
+        # state, r, done, k = option.run(state)
+        # intra option Q-learning
+        state, r, done, k = option.run(state, "intra option learning", multi_step_options, Q_table, alpha)
     else:
         # primitive action
         state, r, done, _ = env.step(option)

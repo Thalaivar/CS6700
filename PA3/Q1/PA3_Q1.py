@@ -1,6 +1,10 @@
 import gym
 import numpy as np
 from options import HallwayOption
+import matplotlib.pyplot as plt
+
+N_EPISODES = 10000
+N_RUNS = 30
 
 def main(goal_state):
     env = gym.make("room_world:room-v0")
@@ -10,31 +14,68 @@ def main(goal_state):
     elif goal_state == 2:
         env.goal = env.G2
 
+    steps, Q_table = train(env)
+    plt.plot(np.arange(N_EPISODES), steps)
+    plt.show()
+
 def train(env):
+    alpha = 1/32
+
+    # total of 12 options: 4 primitive actions and 8 multi-step options
+
     # multi-step options
     multi_step_options = create_options(env)
-
     
+    # track of steps per episode
+    steps = np.zeros((N_EPISODES,))
 
+    for j in range(N_RUNS):
+        Q_table = np.zeros((13, 13, 12))
+        for i in range(N_EPISODES):
+            done = False
+            state = env.reset()
+            current_steps = 0
+            while not done:
+                x, y = state
+                option = policy(state, multi_step_options, Q_table)
+                new_state, r, done, k = step(env, option, state, multi_step_options)
+
+                # check valid options in new state
+                valid_opts = valid_options(state, multi_step_options)
+                x_new, y_new = new_state
+                # Q - learning update
+                Q_table[x, y, option] += alpha*(r + (env.gamma**k)*np.max(Q_table[x_new, y_new, valid_opts]) - Q_table[x, y, option])
+                # print(state,"->", option, "->", new_state, "r:", r)
+                state = new_state
+
+                current_steps +=1
+                # print(current_steps)
+
+            steps[i] += current_steps
+            # if i % 1000 == 0:
+            #     print("Episode: %d"%(i))
+        print("Run = ", j)
+    return steps/N_RUNS, Q_table
 
 # composite step function to include multi-step options
 def step(env, option, state, multi_step_options):
     # for multi-step option
     if option > 3:
         # retrieve multi-step option
-        option = multi_step_options[option-4]
-        state, r, done = option.run(state)
+        option = multi_step_options[(option-4)[0]]
+        state, r, done, k = option.run(state)
     else:
         # primitive action
         state, r, done, _ = env.step(option)
+        k = 1
     
-    return state, r, done
+    return state, r, done, k
 
 
 # policy to choose a valid option given a state
-def policy(state, options, Q_table):
+def policy(state, multi_step_options, Q_table):
     x, y = state
-    valid_opts = valid_options(state, options)
+    valid_opts = valid_options(state, multi_step_options)
 
     # epsilon - greedy option selection
     eps = 0.1
@@ -43,23 +84,26 @@ def policy(state, options, Q_table):
         option = np.random.choice(valid_opts, size = 1)
     else:
         # choose greedily from valid options
-        max_option = valid_opts[0]
-        max_Q = Q_table[x, y, valid_opts[0]]
-        for o in valid_opts:
-            if Q_table[x, y, o] > max_Q:
-                max_Q = Q_table[x, y, o]
-                max_option = o
-
-        option = max_option
+        option = greedy_option(x, y, valid_opts, Q_table)
 
     return option
 
+def greedy_option(x, y, valid_opts, Q_table):
+    # get all options with same max value
+    max_equal_opts = []
+    max_Q = np.max(Q_table[x, y, valid_opts])
+    for o in valid_opts:
+        if Q_table[x, y, o] == max_Q:
+            max_equal_opts.append(o)
+
+    return np.random.choice(max_equal_opts, size=1)
+
 # given state, return valid options
-def valid_options(state, options):
+def valid_options(state, multi_step_options):
     i = 0
     # primitive actions are always valid options
     valid_opts = [0, 1, 2, 3]
-    for option in options:
+    for option in multi_step_options:
         # if state is in option's initiation set, option is valid
         if state in option.init_set:
             valid_opts.append(i+4)
@@ -70,38 +114,29 @@ def valid_options(state, options):
 
 # create all 8 multi-step options
 def create_options(env):
-    # 4 rooms
-    ROOM_1 = [[1,7], [2,7], [3,7], [4,7], [5,7],
-              [1,8], [2,8], [3,8], [4,8], [5,8],
-              [1,9], [2,9], [3,9], [4,9], [5,9],
-              [1,10], [2,10], [3,10], [4,10], [5,10],
-              [1,11], [2,11], [3,11], [4,11], [5,11]]
-    ROOM_2 = [[7,6], [8,6], [9,6], [10,6], [11,6],
-              [7,7], [8,7], [9,7], [10,7], [11,7],
-              [7,8], [8,8], [9,8], [10,8], [11,8],
-              [7,9], [8,9], [9,9], [10,9], [11,9],
-              [7,10], [8,10], [9,10], [10,10], [11,10],
-              [7,11], [8,11], [9,11], [10,11], [11,11]]
+    HallwayOption.env = env
+    # hallways are of two types, 0 -> walls on left and right
+    # 1 -> walls on top and bottom
+    options = []
+    for i in range(4):
+        options.append(HallwayOption(0, i+1))
+        options.append(HallwayOption(1, i+1))
+    
+    return options
 
-    ROOM_3 = [[7,1], [8,1], [9,1], [10,1], [11,1],
-              [7,2], [8,2], [9,2], [10,2], [11,2],
-              [7,3], [8,3], [9,3], [10,3], [11,3],
-              [7,4], [8,4], [9,4], [10,4], [11,4]]
+def visualize(Q_table, env, options):
+    grid_size = [Q_table.shape[0], Q_table.shape[1]]
+    # plot where options are taken
+    opts_vis_Q_table = np.zeros((grid_size[0], grid_size[1]))
+    
+    for i in range(grid_size[0]):
+        for j in range(grid_size[1]):
+            state = [i,j]
+            # valid options in this state
+            valid_opts = valid_options(state, options)
+            # get best option
 
-    ROOM_4 = [[1,1], [2,1], [3,1], [4,1], [5,1],
-              [1,2], [2,2], [3,2], [4,2], [5,2],
-              [1,3], [2,3], [3,3], [4,3], [5,3],
-              [1,4], [2,4], [3,4], [4,4], [5,4],
-              [1,5], [2,5], [3,5], [4,5], [5,5]]
 
-    option_1_1 = HallwayOption(ROOM_1, env.hallways[2], 0, env, env.hallways[1])
-    option_1_2 = HallwayOption(ROOM_1, env.hallways[1], 1, env, env.hallways[2])
-    option_2_1 = HallwayOption(ROOM_2, env.hallways[2], 0, env, env.hallways[3])
-    option_2_2 = HallwayOption(ROOM_2, env.hallways[3], 1, env, env.hallways[2])
-    option_3_1 = HallwayOption(ROOM_3, env.hallways[3], 1, env, env.hallways[0])
-    option_3_2 = HallwayOption(ROOM_3, env.hallways[0], 0, env, env.hallways[3])
-    option_4_1 = HallwayOption(ROOM_4, env.hallways[0], 0, env, env.hallways[1])
-    option_4_2 = HallwayOption(ROOM_4, env.hallways[1], 1, env, env.hallways[0])
 
-    return [option_1_1, option_1_2, option_2_1, option_2_2, option_3_1, option_3_2,
-            option_4_1, option_4_2]
+if __name__ == '__main__':
+    main(1)

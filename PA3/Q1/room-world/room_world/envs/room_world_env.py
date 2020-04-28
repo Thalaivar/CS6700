@@ -24,6 +24,7 @@ class RoomWorld(gym.Env):
 
         self.state = None
         self.goal = None
+        self.random_transition = True
 
     def create_parameters(self):
         # mark the outer walls
@@ -43,8 +44,8 @@ class RoomWorld(gym.Env):
         [8,5], [10,5], [11,5], [5,6], [4,6], [3,6], 
         [1,6]])
 
-        # hallways
-        self.hallways = [[6,2], [2,6], [6,9], [9,5]]
+        # hallways (arranged according to type, room wise)
+        self.hallways = [[[2,6], [6,9]], [[9,5], [6,9]], [[9,5], [6,2]], [[2,6], [6,2]]]
 
         # goal states
         self.G2 = [9,3]
@@ -81,7 +82,7 @@ class RoomWorld(gym.Env):
         done = False
 
         # reward for reaching goal state
-        if self.state == self.goal:
+        if list(self.state) == self.goal:
             r = 1
             done = True
         

@@ -24,7 +24,7 @@ class RoomWorld(gym.Env):
 
         self.state = None
         self.goal = None
-        self.random_transition = True
+        self.initial_state_fix = False
 
     def create_parameters(self):
         # mark the outer walls
@@ -55,12 +55,16 @@ class RoomWorld(gym.Env):
         self.gamma = 0.9
 
     def reset(self):
-        init  = False
-        while not init: 
-            x0, y0 = self.observation_space.sample()
-            if [x0, y0] not in self.walls:
-                self.state = (x0, y0)
-                init = True
+        if self.initial_state_fix:
+            self.state = (3,3)
+            
+        else:
+            init  = False
+            while not init: 
+                x0, y0 = self.observation_space.sample()
+                if [x0, y0] not in self.walls:
+                    self.state = (x0, y0)
+                    init = True
 
         return list(self.state)
 

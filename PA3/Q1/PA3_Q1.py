@@ -55,7 +55,7 @@ def train(env):
             # if i % 1000 == 0:
             #     print("Episode: %d"%(i))
         print("Run = ", j)
-    return steps/N_RUNS, Q_table
+    return steps/N_RUNS, Q_table, multi_step_options
 
 # composite step function to include multi-step options
 def step(env, option, state, multi_step_options):

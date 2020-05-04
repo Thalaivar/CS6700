@@ -7,10 +7,10 @@ from main import create_options, valid_options
 
 def visualize(Q_table, env, steps, options=None):
 
-    plt.plot(np.arange(1000), steps)
-    plt.xlabel("Episodes")
-    plt.ylabel("Steps")
-    plt.show()
+    # plt.plot(np.arange(1000), steps)
+    # plt.xlabel("Episodes")
+    # plt.ylabel("Steps")
+    # plt.show()
 
     if options is None:
         options = create_options(env)
@@ -81,34 +81,41 @@ if __name__ == "__main__":
     """
     SMDP Q-Learning with goal as G1
     """
-    # Q_table = np.load("results/results_Qtable_G1.npy")
-    # steps = np.load("results/results_steps_G1.npy")
-    # visualize(Q_table, env, steps)
+    Q_table = np.load("results/results_Qtable_G1.npy")
+    steps = np.load("results/results_steps_G1.npy")
+    visualize(Q_table, env, steps)
 
     """
     SMDP Q-Learning with goal as G2
     """
-    # Q_table = np.load("results/results_Qtable_G2.npy")
-    # steps = np.load("results/results_steps_G2.npy")
-    # visualize(Q_table, env, steps)
+    Q_table = np.load("results/results_Qtable_G2.npy")
+    steps = np.load("results/results_steps_G2.npy")
+    visualize(Q_table, env, steps)
     
     """
     Part 2 with initial state fixed (goal G1)
     """
-    # Q_table = np.load("results/results_Qtable_Q2_G1.npy")
-    # steps = np.load("results/results_steps_Q2_G1.npy")
-    # visualize(Q_table, env, steps)
+    Q_table = np.load("results/results_Qtable_Q2_G1.npy")
+    steps = np.load("results/results_steps_Q2_G1.npy")
+    visualize(Q_table, env, steps)
 
     """
     Part 2 with initial state fixed (goal G2)
     """
-    # Q_table = np.load("results/results_Qtable_Q2_G2.npy")
-    # steps = np.load("results/results_steps_Q2_G2.npy")
-    # visualize(Q_table, env, steps)
+    Q_table= np.load("results/results_Qtable_Q2_G2.npy")
+    steps = np.load("results/results_steps_Q2_G2.npy")
+    visualize(Q_table, env, steps)
 
     """
     Intra option learning with G1
     """
     Q_table = np.load("results/results_Qtable_IO_G1.npy")
     steps = np.load("results/results_steps_IO_G1.npy")
+    visualize(Q_table, env, steps)
+
+    """
+    Intra option learning with G2
+    """
+    Q_table = np.load("results/results_Qtable_IO_G2.npy")
+    steps = np.load("results/results_steps_IO_G2.npy")
     visualize(Q_table, env, steps)

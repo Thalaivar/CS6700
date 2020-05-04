@@ -62,7 +62,7 @@ class RoomWorld(gym.Env):
             init  = False
             while not init: 
                 x0, y0 = self.observation_space.sample()
-                if [x0, y0] not in self.walls:
+                if [x0, y0] not in self.walls and [x0, y0] != self.goal:
                     self.state = (x0, y0)
                     init = True
 

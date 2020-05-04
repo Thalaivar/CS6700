@@ -5,7 +5,7 @@ from options import HallwayOption
 N_EPISODES = 1000
 N_RUNS = 100
 
-def main(goal_state):
+def main(goal_state, initial_state_fix, intra_option_learning):
     env = gym.make("room_world:room-v0")
 
     if goal_state == 1:
@@ -13,15 +13,14 @@ def main(goal_state):
     elif goal_state == 2:
         env.goal = env.G2
 
-    # uncomment this for part 2
-    env.initial_state_fix = False
+    env.initial_state_fix = initial_state_fix
 
-    steps, Q_table, _ = train(env)
+    steps, Q_table, _ = train(env, intra_option_learning)
 
     np.save("results/results_Qtable_IO_G2", Q_table)
     np.save("results/results_steps_IO_G2", steps)
     
-def train(env):
+def train(env, intra_option_learning):
     alpha = 1/8
 
     # multi-step options
@@ -43,8 +42,10 @@ def train(env):
             while not done:
                 x, y = state
                 option = policy(state, multi_step_options, Q_table)
-                new_state, r, done, k = step(env, option, state, multi_step_options, Q_table, alpha)
-
+                if intra_option_learning:
+                    new_state, r, done, k = step(env, option, state, multi_step_options, Q_table, alpha, "intra option learning")
+                else:
+                    new_state, r, done, k = step(env, option, state, multi_step_options)
                 # check valid options in new state
                 valid_opts = valid_options(new_state, multi_step_options)
                 x_new, y_new = new_state
@@ -65,15 +66,17 @@ def train(env):
 
 
 # composite step function to include multi-step options
-def step(env, option, state, multi_step_options, Q_table=None, alpha=None):
+def step(env, option, state, multi_step_options, Q_table=None, alpha=None, algorithm="SMDP Learning"):
     # for multi-step option
     if option > 3:
         # retrieve multi-step option
         option = multi_step_options[(option-4)[0]]
         # SMDP Q-learning 
-        # state, r, done, k = option.run(state)
+        if algorithm == "SMDP Learning":
+            state, r, done, k = option.run(state)
         # intra option Q-learning
-        state, r, done, k = option.run(state, "intra option learning", multi_step_options, Q_table, alpha)
+        if algorithm == "intra option learning":
+            state, r, done, k = option.run(state, "intra option learning", multi_step_options, Q_table, alpha)
     else:
         # primitive action
         state, r, done, _ = env.step(option)
@@ -135,4 +138,9 @@ def create_options(env):
     return options
 
 if __name__ == '__main__':
-    main(2)
+    # 1 -> G1, 2 -> G2
+    goal = 2
+    initial_state_fix = False
+    intra_option_learning = True
+
+    main(goal, initial_state_fix, intra_option_learning)

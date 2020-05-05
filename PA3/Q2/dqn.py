@@ -6,6 +6,7 @@ import torch.optim as optim
 import numpy as np
 import random
 import collections
+from torch.utils.tensorboard import SummaryWriter
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -24,22 +25,24 @@ class QNetwork(nn.Module):
 
 class DQN:
     REPLAY_MEMORY_SIZE = 10000
-    BATCH_SIZE = 10
-    NUM_EPISODES = 2000
-    GAMMA = 0.99
+    BATCH_SIZE = 64
+    NUM_EPISODES = 10000
+    GAMMA = 1
     MAX_STEPS = 200
-    EPSILON = 0.5
-    LEARNING_RATE = 1e-4
+    EPSILON = 0.1
+    EPSILON_DECAY = 1
+    LEARNING_RATE = 1e-3
     MOMENTUM = 0.9
     TARGET_UPDATE_FREQ = 100
     
 
-    def __init__(self, env):
+    def __init__(self, env, writer):
         self.env = gym.make(env)
         self.input_dim = self.env.observation_space.shape[0]
         self.output_dim = self.env.action_space.n
         self.network = QNetwork(self.input_dim, self.output_dim).to(DEVICE)
         self.target_network = QNetwork(self.input_dim, self.output_dim).to(DEVICE)
+        self.writer = writer
         
         # init replay buffer
         self.replay_buffer = ReplayMemory(self.REPLAY_MEMORY_SIZE, self.BATCH_SIZE)
@@ -53,9 +56,12 @@ class DQN:
 
     def train(self):
         total_steps = 0
+        episode_avg_100 = []
+        episode_avg_track = 0
         for episode in range(self.NUM_EPISODES):
-            steps =0
+            steps = 0
             s = self.env.reset()
+            reward = 0
             while True:
                 # epsilon-greedy policy
                 a = self.policy(s)
@@ -77,12 +83,26 @@ class DQN:
                 steps += 1
                 total_steps += 1
 
+                reward += r
+
                 # check for episode termination
                 if done or steps > self.MAX_STEPS:
                     break
+            
+            episode_avg_track = episode_avg_track % 100
+            if len(episode_avg_100) < 100:
+                episode_avg_100.append(reward)
+            else:
+                episode_avg_100[episode_avg_track] = reward
+            episode_avg_track += 1
 
-            print(episode, ':', steps)
+            # decay exploration
+            # print(episode, self.EPSILON)
+            self.EPSILON *= self.EPSILON_DECAY
+            self.EPSILON = max(0.05, self.EPSILON)
 
+            # writer.add_scalar('Training Reward', reward, episode)
+            self.writer.add_scalars('Progress', {'average reward':sum(episode_avg_100)/len(episode_avg_100), 'reward': reward}, episode)
 
     def Q_learning(self):
         # skip until replay buffer has sufficient number of samples
@@ -159,7 +179,7 @@ class ReplayMemory:
     def __len__(self):
         return len(self.buffer)
 
-
 if __name__ == "__main__":
     dqn = DQN('CartPole-v0')
     dqn.train()
+    writer.close()

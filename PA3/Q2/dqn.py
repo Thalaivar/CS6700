@@ -10,54 +10,71 @@ from torch.utils.tensorboard import SummaryWriter
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+writer = SummaryWriter('runs/')
+
 class QNetwork(nn.Module):
     # hidden layer sizes
-    H1_SIZE = 32
+    H1_SIZE = 64
+    H2_SIZE = 64
 
     def __init__(self, input_dim, output_dim):
         super(QNetwork, self).__init__()
         self.fc1 = nn.Linear(in_features=input_dim, out_features=self.H1_SIZE)
-        self.output = nn.Linear(in_features=self.H1_SIZE, out_features=output_dim)
+        self.fc2 = nn.Linear(in_features=self.H1_SIZE, out_features=self.H2_SIZE)
+        self.output = nn.Linear(in_features=self.H2_SIZE, out_features=output_dim)
         
     def forward(self, x):
         x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         return self.output(x)
 
 class DQN:
-    REPLAY_MEMORY_SIZE = 10000
-    BATCH_SIZE = 64
-    NUM_EPISODES = 10000
-    GAMMA = 1
+    REPLAY_MEMORY_SIZE = 1e6
+    BATCH_SIZE = 512
+    NUM_EPISODES = 2000
+    # GAMMA = 0.99
     MAX_STEPS = 200
-    EPSILON = 0.1
-    EPSILON_DECAY = 1
-    LEARNING_RATE = 1e-3
+    EPSILON = 0.5
+    EPSILON_DECAY = 0.9985
+    LEARNING_RATE = 1e-4
     MOMENTUM = 0.9
-    TARGET_UPDATE_FREQ = 100
+    TARGET_UPDATE_FREQ = 200
+    TAU = 0.999
     
 
-    def __init__(self, env, writer):
+    def __init__(self, env):
         self.env = gym.make(env)
         self.input_dim = self.env.observation_space.shape[0]
         self.output_dim = self.env.action_space.n
         self.network = QNetwork(self.input_dim, self.output_dim).to(DEVICE)
         self.target_network = QNetwork(self.input_dim, self.output_dim).to(DEVICE)
-        self.writer = writer
         
         # init replay buffer
         self.replay_buffer = ReplayMemory(self.REPLAY_MEMORY_SIZE, self.BATCH_SIZE)
         
         # init target network
+        self.network.apply(init_weights)
         self.target_network.load_state_dict(self.network.state_dict())     
+        self.target_network.eval()
 
         # loss function and optimizer
         self.criterion = nn.MSELoss()  
-        self.optimizer = optim.SGD(self.network.parameters(), lr=self.LEARNING_RATE, momentum=self.MOMENTUM)
+        # self.optimizer = optim.SGD(self.network.parameters(), lr=self.LEARNING_RATE, momentum=self.MOMENTUM)
+        self.optimizer = optim.RMSprop(self.network.parameters(), lr=self.LEARNING_RATE)
 
     def train(self):
         total_steps = 0
         episode_avg_100 = []
         episode_avg_track = 0
+        best_perform = 0
+
+        # to save plotting data
+        avg_data = np.zeros((self.NUM_EPISODES,))
+        episode_data = np.zeros((self.NUM_EPISODES,))
+
+        # fill buffer initially
+        self.gather_experience()
+
         for episode in range(self.NUM_EPISODES):
             steps = 0
             s = self.env.reset()
@@ -75,9 +92,11 @@ class DQN:
                 # Q-learning step
                 self.Q_learning()
 
-                # update target network weights
-                if total_steps % self.TARGET_UPDATE_FREQ == 0:
-                    self.target_network.load_state_dict(self.network.state_dict())
+                # # update target network weights
+                # if total_steps % self.TARGET_UPDATE_FREQ == 0:
+                #     with torch.no_grad():
+                #         self.target_network.load_state_dict(self.network.state_dict())
+                self.soft_update()
 
                 s = new_s
                 steps += 1
@@ -95,14 +114,28 @@ class DQN:
             else:
                 episode_avg_100[episode_avg_track] = reward
             episode_avg_track += 1
+            
+            avg_metric = sum(episode_avg_100)/len(episode_avg_100)
+            if avg_metric >= 195:
+                if reward >= best_perform:
+                    print(best_perform, avg_metric, episode)
+                    best_perform = reward
+                    torch.save(self.network.state_dict(), 'best_model')
+
 
             # decay exploration
-            # print(episode, self.EPSILON)
             self.EPSILON *= self.EPSILON_DECAY
-            self.EPSILON = max(0.05, self.EPSILON)
+            print(episode, self.EPSILON)
+            self.EPSILON = max(0.05 , self.EPSILON)
 
             # writer.add_scalar('Training Reward', reward, episode)
-            self.writer.add_scalars('Progress', {'average reward':sum(episode_avg_100)/len(episode_avg_100), 'reward': reward}, episode)
+            writer.add_scalars('Progress', {'average reward': avg_metric, 'reward': reward}, episode)
+
+            # save data
+            avg_data[episode] = avg_metric
+            episode_data[episode] = reward
+
+        return avg_data, episode_data
 
     def Q_learning(self):
         # skip until replay buffer has sufficient number of samples
@@ -144,6 +177,53 @@ class DQN:
 
         return action
 
+    def gather_experience(self):
+        s = self.env.reset()
+        while len(self.replay_buffer) < self.REPLAY_MEMORY_SIZE:
+            # epsilon-greedy policy
+            a = self.policy(s)
+            
+            # step in environment
+            new_s, r, done, _ = self.env.step(a)
+
+            # add experience to replay buffer
+            self.replay_buffer.add(s, a, r, new_s, done)    
+
+            if done:
+                s = self.env.reset()
+            else:
+                s = new_s
+
+    def soft_update(self):
+        target_params = self.target_network.named_parameters()
+        q_params = self.network.named_parameters()
+
+        dict_target_params = dict(target_params)
+        for name, param in q_params:
+            if name in dict_target_params:
+                dict_target_params[name].data.copy_(self.TAU*dict_target_params[name].data + (1-self.TAU)*param.data)
+        
+        self.target_network.load_state_dict(dict_target_params)
+
+    def playPolicy(self, path):
+        self.network.load_state_dict(torch.load(path))
+        
+        done = False
+        steps = 0
+        s = self.env.reset()
+        s = torch.from_numpy(s).float().to(DEVICE)
+
+        while not done and steps < 200:
+            self.env.render()
+            q_vals = self.network(s)
+            action = q_vals.max(0)[1].item()
+            s, _, done, _ = self.env.step(action)
+            s = torch.from_numpy(s).float().to(DEVICE)
+            steps += 1
+        
+        return steps
+
+
 
 # to handle experiences
 class ReplayMemory:
@@ -162,7 +242,7 @@ class ReplayMemory:
         else:
             self.buffer[self.pos] = e
         self.pos += 1
-        self.pos = self.pos % self.buffer_size
+        self.pos = int(self.pos % self.buffer_size)
 
     def sample(self):
         batch = random.sample(self.buffer, self.batch_size)
@@ -179,7 +259,13 @@ class ReplayMemory:
     def __len__(self):
         return len(self.buffer)
 
+def init_weights(w):
+    if type(w) == nn.Linear:
+        nn.init.xavier_normal_(w.weight)
+
 if __name__ == "__main__":
     dqn = DQN('CartPole-v0')
-    dqn.train()
+    avg_data, episode_data = dqn.train()
+    np.save('average_data.npy', avg_data)
+    np.save('episode_data.npy', episode_data)
     writer.close()

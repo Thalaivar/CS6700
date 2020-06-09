@@ -17,8 +17,8 @@ def main(goal_state, initial_state_fix, intra_option_learning):
 
     steps, Q_table, _ = train(env, intra_option_learning)
 
-    np.save("results/results_Qtable_IO_G2", Q_table)
-    np.save("results/results_steps_IO_G2", steps)
+    np.save("results_Qtable_IO_G2", Q_table)
+    np.save("results_steps_IO_G2", steps)
     
 def train(env, intra_option_learning):
     alpha = 1/8

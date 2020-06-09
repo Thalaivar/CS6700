@@ -7,11 +7,10 @@ import numpy as np
 import random
 import collections
 from torch.utils.tensorboard import SummaryWriter
-import copy
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# writer = SummaryWriter('runs/')
+writer = SummaryWriter('runs/')
 
 # class to define the neural network to be used to approximate the Q function
 class QNetwork(nn.Module):
@@ -73,7 +72,7 @@ class DQN:
         # to use target network
         self.USE_TARGET_NET = True
 
-    def train(self, writer):
+    def train(self):
         # total steps taken during training
         total_steps = 0
         # to calculate average reward over 100 episodes
@@ -316,39 +315,12 @@ def init_weights(w):
         nn.init.xavier_normal_(w.weight)
 
 if __name__ == "__main__":
-    # dqn = DQN('CartPole-v0')
+    dqn = DQN('CartPole-v0')
     # to use experience replay
     # dqn.USE_EXP_REPLAY = False
-    
     # to use target network
     # dqn.USE_TARGET_NET = False
-    
-    # total number of trials
-    NUM_TRIALS = 10
-    rewards = []
-    avg_rewards = []
-
-    for i in range(NUM_TRIALS):
-        writerDir = 'runs/runs'+ str(i)
-        writer = SummaryWriter(writerDir)
-        dqn = DQN('CartPole-v0')
-        if i > 0:
-            dqn.replay_buffer = replay_buffer
-        avg_data, episode_data = dqn.train(writer)
-        replay_buffer = copy.deepcopy(dqn.replay_buffer)
-        rewards.append(episode_data)
-        avg_rewards.append(avg_data)
-        print("Run:",i)
-        writer.close()
-        del dqn
-
-    final_rewards = np.zeros(rewards[0].shape)
-    final_avg_rewards = np.zeros(avg_rewards[0].shape)
-    for r in rewards:
-        final_rewards += r
-    for r in avg_rewards:
-        final_avg_rewards += r
-    
-    np.save('average_data.npy', final_avg_rewards/NUM_TRIALS)
-    np.save('episode_data.npy', final_rewards/NUM_TRIALS)
-    # writer.close()
+    avg_data, episode_data = dqn.train()
+    np.save('average_data.npy', avg_data)
+    np.save('episode_data.npy', episode_data)
+    writer.close()
